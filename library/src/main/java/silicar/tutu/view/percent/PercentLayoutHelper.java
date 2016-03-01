@@ -284,9 +284,9 @@ public class PercentLayoutHelper
             case BASE_SCREEN_HEIGHT:
                 return mHeightScreen;
             case BASE_AUTO_HEIGHT:
-                return info.heightDesign / mHeightScreen;
+                return mHeightScreen / info.heightDesign;
             case BASE_AUTO_WIDTH:
-                return info.widthDesign / mWidthScreen;
+                return mWidthScreen / info.widthDesign;
         }
         return 0;
     }
@@ -325,7 +325,7 @@ public class PercentLayoutHelper
     }
 
     private static PercentLayoutInfo setDesignSizeVal(TypedArray array, PercentLayoutInfo info) {
-        //TODO: Design size
+        info = checkForInfoExists(info);
         info.widthDesign = array.getDimension(R.styleable.PercentLayout_layout_widthDesign, mWidthScreen);
         info.heightDesign = array.getDimension(R.styleable.PercentLayout_layout_heightDesign, mWidthScreen);
         return info;
@@ -624,9 +624,11 @@ public class PercentLayoutHelper
             percentVal.basemode = PercentLayoutInfo.BaseMode.BASE_SCREEN_HEIGHT;
         } else if (percentStr.endsWith(PercentLayoutInfo.BaseMode.AW))
         {
+            percentVal.percent = percentVal.percent * 100f;
             percentVal.basemode = PercentLayoutInfo.BaseMode.BASE_AUTO_WIDTH;
         } else if (percentStr.endsWith(PercentLayoutInfo.BaseMode.AH))
         {
+            percentVal.percent = percentVal.percent * 100f;
             percentVal.basemode = PercentLayoutInfo.BaseMode.BASE_AUTO_HEIGHT;
         } else if (percentStr.endsWith(PercentLayoutInfo.BaseMode.PERCENT))
         {
@@ -639,6 +641,7 @@ public class PercentLayoutHelper
             }
         } else if (percentStr.endsWith(PercentLayoutInfo.BaseMode.AUTO))
         {
+            percentVal.percent = percentVal.percent * 100f;
             if (isOnWidth)
             {
                 percentVal.basemode = PercentLayoutInfo.BaseMode.BASE_AUTO_WIDTH;
