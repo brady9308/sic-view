@@ -165,17 +165,17 @@ public class PercentLayoutHelper
                 }
                 if (info != null)
                 {
-                    supportTextSize(widthHint, heightHint, view, info);
-                    supportPadding(widthHint, heightHint, view, info);
-                    supportMinOrMaxDimesion(widthHint, heightHint, view, info);
+                    fillTextSize(widthHint, heightHint, view, info);
+                    fillPadding(widthHint, heightHint, view, info);
+                    fillMinOrMaxDimension(widthHint, heightHint, view, info);
 
                     if (params instanceof ViewGroup.MarginLayoutParams)
                     {
-                        info.fillMarginLayoutParams((ViewGroup.MarginLayoutParams) params,
-                                widthHint, heightHint);
+                        fillMarginLayoutParams((ViewGroup.MarginLayoutParams) params,
+                                widthHint, heightHint, info);
                     } else
                     {
-                        info.fillLayoutParams(params, widthHint, heightHint);
+                        fillLayoutParams(params, widthHint, heightHint, info);
                     }
                 }
             }
@@ -184,7 +184,64 @@ public class PercentLayoutHelper
 
     }
 
-    private void supportPadding(int widthHint, int heightHint, View view, PercentLayoutInfo info)
+    /**
+     * Iterates over children and restores their original dimensions that were changed for
+     * percentage values. Calling this method only makes sense if you previously called
+     * {@link PercentLayoutHelper#adjustChildren(int, int)}.
+     */
+    public void restoreOriginalParams()
+    {
+        for (int i = 0, N = mHost.getChildCount(); i < N; i++)
+        {
+            View view = mHost.getChildAt(i);
+            ViewGroup.LayoutParams params = view.getLayoutParams();
+            if (Log.isLoggable(TAG, Log.DEBUG))
+            {
+                Log.d(TAG, "should restore " + view + " " + params);
+            }
+            if (params instanceof PercentLayoutParams)
+            {
+                PercentLayoutInfo info =
+                        ((PercentLayoutParams) params).getPercentLayoutInfo();
+                if (Log.isLoggable(TAG, Log.DEBUG))
+                {
+                    Log.d(TAG, "using " + info);
+                }
+                if (info != null)
+                {
+                    if (params instanceof ViewGroup.MarginLayoutParams)
+                    {
+                        restoreMarginLayoutParams((ViewGroup.MarginLayoutParams) params, info);
+                    } else
+                    {
+                        restoreLayoutParams(params, info);
+                    }
+                }
+            }
+        }
+    }
+
+
+    ///////////// 计算过程 /////////////
+
+    public void fillTextSize(int widthHint, int heightHint, View view, PercentLayoutInfo info)
+    {
+        //textsize percent support
+
+        PercentLayoutInfo.PercentVal textSizePercent = info.textSizePercent;
+        if (textSizePercent == null) return;
+
+        float base = getBaseByModeAndVal(widthHint, heightHint, info, textSizePercent.basemode);
+        float textSize = (int) (base * textSizePercent.percent);
+
+        //Button 和 EditText 是TextView的子类
+        if (view instanceof TextView)
+        {
+            ((TextView) view).setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize);
+        }
+    }
+
+    public void fillPadding(int widthHint, int heightHint, View view, PercentLayoutInfo info)
     {
         int left = view.getPaddingLeft(), right = view.getPaddingRight(), top = view.getPaddingTop(), bottom = view.getPaddingBottom();
         PercentLayoutInfo.PercentVal percentVal = info.paddingLeftPercent;
@@ -218,23 +275,16 @@ public class PercentLayoutHelper
 
     }
 
-    private void supportMinOrMaxDimesion(int widthHint, int heightHint, View view, PercentLayoutInfo info)
+    public void fillMinOrMaxDimension(int widthHint, int heightHint, View view, PercentLayoutInfo info)
     {
+        Class clazz = view.getClass();
         try
         {
-            Class clazz = view.getClass();
             invokeMethod("setMaxWidth", widthHint, heightHint, view, clazz, info, info.maxWidthPercent);
             invokeMethod("setMaxHeight", widthHint, heightHint, view, clazz, info, info.maxHeightPercent);
             invokeMethod("setMinWidth", widthHint, heightHint, view, clazz, info, info.minWidthPercent);
             invokeMethod("setMinHeight", widthHint, heightHint, view, clazz, info, info.minHeightPercent);
-
-        } catch (NoSuchMethodException e)
-        {
-            e.printStackTrace();
-        } catch (InvocationTargetException e)
-        {
-            e.printStackTrace();
-        } catch (IllegalAccessException e)
+        } catch (Exception e)
         {
             e.printStackTrace();
         }
@@ -243,8 +293,8 @@ public class PercentLayoutHelper
 
     private void invokeMethod(String methodName, int widthHint, int heightHint, View view, Class clazz, PercentLayoutInfo info, PercentLayoutInfo.PercentVal percentVal) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException
     {
-        if (Log.isLoggable(TAG, Log.DEBUG))
-            Log.d(TAG, methodName + " ==> " + percentVal);
+        //if (Log.isLoggable(TAG, Log.DEBUG))
+        //    Log.d(TAG, methodName + " ==> " + percentVal);
         if (percentVal != null)
         {
             Method setMaxWidthMethod = clazz.getMethod(methodName, int.class);
@@ -254,44 +304,125 @@ public class PercentLayoutHelper
         }
     }
 
-    private void supportTextSize(int widthHint, int heightHint, View view, PercentLayoutInfo info)
+    /**
+     * Fills {@code ViewGroup.MarginLayoutParams} dimensions and margins based on percentage
+     * values.
+     */
+    public void fillMarginLayoutParams(ViewGroup.MarginLayoutParams params, int widthHint,
+                                       int heightHint, PercentLayoutInfo info)
     {
-        //textsize percent support
+        fillLayoutParams(params, widthHint, heightHint, info);
 
-        PercentLayoutInfo.PercentVal textSizePercent = info.textSizePercent;
-        if (textSizePercent == null) return;
+        // Preserver the original margins, so we can restore them after the measure step.
+        info.mPreservedParams.leftMargin = params.leftMargin;
+        info.mPreservedParams.topMargin = params.topMargin;
+        info.mPreservedParams.rightMargin = params.rightMargin;
+        info.mPreservedParams.bottomMargin = params.bottomMargin;
+        MarginLayoutParamsCompat.setMarginStart(info.mPreservedParams,
+                MarginLayoutParamsCompat.getMarginStart(params));
+        MarginLayoutParamsCompat.setMarginEnd(info.mPreservedParams,
+                MarginLayoutParamsCompat.getMarginEnd(params));
 
-        float base = getBaseByModeAndVal(widthHint, heightHint, info, textSizePercent.basemode);
-        float textSize = (int) (base * textSizePercent.percent);
-
-        //Button 和 EditText 是TextView的子类
-        if (view instanceof TextView)
+        if (info.leftMarginPercent != null)
         {
-            ((TextView) view).setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize);
+            float base = getBaseByModeAndVal(widthHint, heightHint, info, info.leftMarginPercent.basemode);
+            params.leftMargin = (int) (base * info.leftMarginPercent.percent);
+        }
+        if (info.topMarginPercent != null)
+        {
+            float base = getBaseByModeAndVal(widthHint, heightHint, info, info.topMarginPercent.basemode);
+            params.topMargin = (int) (base * info.topMarginPercent.percent);
+        }
+        if (info.rightMarginPercent != null)
+        {
+            float base = getBaseByModeAndVal(widthHint, heightHint, info, info.rightMarginPercent.basemode);
+            params.rightMargin = (int) (base * info.rightMarginPercent.percent);
+        }
+        if (info.bottomMarginPercent != null)
+        {
+            float base = getBaseByModeAndVal(widthHint, heightHint, info, info.bottomMarginPercent.basemode);
+            params.bottomMargin = (int) (base * info.bottomMarginPercent.percent);
+        }
+        if (info.startMarginPercent != null)
+        {
+            float base = getBaseByModeAndVal(widthHint, heightHint, info, info.startMarginPercent.basemode);
+            MarginLayoutParamsCompat.setMarginStart(params,
+                    (int) (base * info.startMarginPercent.percent));
+        }
+        if (info.endMarginPercent != null)
+        {
+            float base = getBaseByModeAndVal(widthHint, heightHint, info, info.endMarginPercent.basemode);
+            MarginLayoutParamsCompat.setMarginEnd(params,
+                    (int) (base * info.endMarginPercent.percent));
+        }
+        if (Log.isLoggable(TAG, Log.DEBUG))
+        {
+            Log.d(TAG, "after fillMarginLayoutParams: (" + params.width + ", " + params.height
+                    + ")");
         }
     }
 
-    private static float getBaseByModeAndVal(int widthHint, int heightHint, PercentLayoutInfo info, PercentLayoutInfo.BaseMode baseMode)
+    /**
+     * Fills {@code ViewGroup.LayoutParams} dimensions based on percentage values.
+     */
+    public void fillLayoutParams(ViewGroup.LayoutParams params, int widthHint,
+                                 int heightHint, PercentLayoutInfo info)
     {
-        switch (baseMode)
+        // Preserve the original layout params, so we can restore them after the measure step.
+        info.mPreservedParams.width = params.width;
+        info.mPreservedParams.height = params.height;
+
+        if (info.widthPercent != null)
         {
-            case BASE_HEIGHT:
-                return heightHint;
-            case BASE_WIDTH:
-                return widthHint;
-            case BASE_SCREEN_WIDTH:
-                return mWidthScreen;
-            case BASE_SCREEN_HEIGHT:
-                return mHeightScreen;
-            case BASE_AUTO_HEIGHT:
-                return mHeightScreen / info.heightDesign;
-            case BASE_AUTO_WIDTH:
-                return mWidthScreen / info.widthDesign;
+            float base = getBaseByModeAndVal(widthHint, heightHint, info, info.widthPercent.basemode);
+            params.width = (int) (base * info.widthPercent.percent);
         }
-        return 0;
+        if (info.heightPercent != null)
+        {
+            float base = getBaseByModeAndVal(widthHint, heightHint, info, info.heightPercent.basemode);
+            params.height = (int) (base * info.heightPercent.percent);
+        }
+
+        if (Log.isLoggable(TAG, Log.DEBUG))
+        {
+            Log.d(TAG, "after fillLayoutParams: (" + params.width + ", " + params.height + ")");
+        }
     }
 
 
+    ///////////// 重置过程 /////////////
+
+    /**
+     * Restores original dimensions and margins after they were changed for percentage based
+     * values. Calling this method only makes sense if you previously called
+     * {@link PercentLayoutHelper.PercentLayoutInfo#fillMarginLayoutParams}.
+     */
+    public void restoreMarginLayoutParams(ViewGroup.MarginLayoutParams params, PercentLayoutInfo info)
+    {
+        restoreLayoutParams(params, info);
+        params.leftMargin = info.mPreservedParams.leftMargin;
+        params.topMargin = info.mPreservedParams.topMargin;
+        params.rightMargin = info.mPreservedParams.rightMargin;
+        params.bottomMargin = info.mPreservedParams.bottomMargin;
+        MarginLayoutParamsCompat.setMarginStart(params,
+                MarginLayoutParamsCompat.getMarginStart(info.mPreservedParams));
+        MarginLayoutParamsCompat.setMarginEnd(params,
+                MarginLayoutParamsCompat.getMarginEnd(info.mPreservedParams));
+    }
+
+    /**
+     * Restores original dimensions after they were changed for percentage based values. Calling
+     * this method only makes sense if you previously called
+     * {@link PercentLayoutHelper.PercentLayoutInfo#fillLayoutParams}.
+     */
+    public void restoreLayoutParams(ViewGroup.LayoutParams params, PercentLayoutInfo info)
+    {
+        params.width = info.mPreservedParams.width;
+        params.height = info.mPreservedParams.height;
+    }
+
+    ///////////// 赋值过程 /////////////
+    
     /**
      * Constructs a PercentLayoutInfo from attributes associated with a View. Call this method from
      * {@code LayoutParams(Context c, AttributeSet attrs)} constructor.
@@ -571,10 +702,17 @@ public class PercentLayoutHelper
     @NonNull
     private static PercentLayoutInfo checkForInfoExists(PercentLayoutInfo info)
     {
-        info = info != null ? info : new PercentLayoutInfo();
+        info = (info != null) ? info : new PercentLayoutInfo();
         return info;
     }
 
+    /**
+     * 获取参数
+     * @param array
+     * @param index
+     * @param baseWidth
+     * @return
+     */
     private static PercentLayoutInfo.PercentVal getPercentVal(TypedArray array, int index, boolean baseWidth)
     {
         String sizeStr = array.getString(index);
@@ -582,13 +720,13 @@ public class PercentLayoutHelper
         return percentVal;
     }
 
-
     private static final String REGEX_PERCENT = "^(([0-9]+)([.]([0-9]+))?|([.]([0-9]+))?)(%|a)([s]?[wh]?)$";
 
     /**
+     * 解析参数
      * widthStr to PercentVal
      * <br/>
-     * eg: 35%w => new PercentVal(35, true)
+     * eg: 35%w => new PercentVal("35%", true)
      *
      * @param percentStr
      * @param isOnWidth
@@ -610,7 +748,6 @@ public class PercentLayoutHelper
         int len = percentStr.length();
         //extract the float value
         String floatVal = matcher.group(1);
-        String lastAlpha = percentStr.substring(len - 1);
 
         float percent = Float.parseFloat(floatVal) / 100f;
 
@@ -657,49 +794,41 @@ public class PercentLayoutHelper
             percentVal.basemode = PercentLayoutInfo.BaseMode.BASE_HEIGHT;
         } else
         {
-            throw new IllegalArgumentException("the " + percentStr + " must be endWith [%|w|h|sw|sh]");
+            throw new IllegalArgumentException("the " + percentStr + " must be endWith [%|a|w|h|sw|sh|aw|ah]");
         }
 
         return percentVal;
     }
 
     /**
-     * Iterates over children and restores their original dimensions that were changed for
-     * percentage values. Calling this method only makes sense if you previously called
-     * {@link PercentLayoutHelper#adjustChildren(int, int)}.
+     * 获取不同模式基础值
+     * @param widthHint
+     * @param heightHint
+     * @param info
+     * @param baseMode
+     * @return
      */
-
-    public void restoreOriginalParams()
+    private static float getBaseByModeAndVal(int widthHint, int heightHint, PercentLayoutInfo info, PercentLayoutInfo.BaseMode baseMode)
     {
-        for (int i = 0, N = mHost.getChildCount(); i < N; i++)
+        switch (baseMode)
         {
-            View view = mHost.getChildAt(i);
-            ViewGroup.LayoutParams params = view.getLayoutParams();
-            if (Log.isLoggable(TAG, Log.DEBUG))
-            {
-                Log.d(TAG, "should restore " + view + " " + params);
-            }
-            if (params instanceof PercentLayoutParams)
-            {
-                PercentLayoutInfo info =
-                        ((PercentLayoutParams) params).getPercentLayoutInfo();
-                if (Log.isLoggable(TAG, Log.DEBUG))
-                {
-                    Log.d(TAG, "using " + info);
-                }
-                if (info != null)
-                {
-                    if (params instanceof ViewGroup.MarginLayoutParams)
-                    {
-                        info.restoreMarginLayoutParams((ViewGroup.MarginLayoutParams) params);
-                    } else
-                    {
-                        info.restoreLayoutParams(params);
-                    }
-                }
-            }
+            case BASE_HEIGHT:
+                return heightHint;
+            case BASE_WIDTH:
+                return widthHint;
+            case BASE_SCREEN_WIDTH:
+                return mWidthScreen;
+            case BASE_SCREEN_HEIGHT:
+                return mHeightScreen;
+            case BASE_AUTO_HEIGHT:
+                return mHeightScreen / info.heightDesign;
+            case BASE_AUTO_WIDTH:
+                return mWidthScreen / info.widthDesign;
         }
+        return 0;
     }
+
+    ///////////// 比较过程 /////////////
 
     /**
      * Iterates over children and checks if any of them would like to get more space than it
@@ -782,7 +911,7 @@ public class PercentLayoutHelper
     public static class PercentLayoutInfo
     {
 
-        private enum BaseMode
+        public enum BaseMode
         {
 
             BASE_WIDTH, BASE_HEIGHT, BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT, BASE_AUTO_WIDTH, BASE_AUTO_HEIGHT;
@@ -874,7 +1003,8 @@ public class PercentLayoutHelper
         public PercentVal paddingBottomPercent;
 
 
-        /* package */ final ViewGroup.MarginLayoutParams mPreservedParams;
+        /* package */
+        ViewGroup.MarginLayoutParams mPreservedParams;
 
 
         public PercentLayoutInfo()
@@ -882,89 +1012,17 @@ public class PercentLayoutHelper
             mPreservedParams = new ViewGroup.MarginLayoutParams(0, 0);
         }
 
-        /**
-         * Fills {@code ViewGroup.LayoutParams} dimensions based on percentage values.
-         */
-        public void fillLayoutParams(ViewGroup.LayoutParams params, int widthHint,
-                                     int heightHint)
-        {
-            // Preserve the original layout params, so we can restore them after the measure step.
-            mPreservedParams.width = params.width;
-            mPreservedParams.height = params.height;
-
-            if (widthPercent != null)
-            {
-                float base = getBaseByModeAndVal(widthHint, heightHint, this, widthPercent.basemode);
-                params.width = (int) (base * widthPercent.percent);
-            }
-            if (heightPercent != null)
-            {
-                float base = getBaseByModeAndVal(widthHint, heightHint, this, heightPercent.basemode);
-                params.height = (int) (base * heightPercent.percent);
-            }
-
-            if (Log.isLoggable(TAG, Log.DEBUG))
-            {
-                Log.d(TAG, "after fillLayoutParams: (" + params.width + ", " + params.height + ")");
-            }
+        public int getWidthScreen() {
+            return mWidthScreen;
         }
 
-        /**
-         * Fills {@code ViewGroup.MarginLayoutParams} dimensions and margins based on percentage
-         * values.
-         */
-        public void fillMarginLayoutParams(ViewGroup.MarginLayoutParams params, int widthHint,
-                                           int heightHint)
-        {
-            fillLayoutParams(params, widthHint, heightHint);
+        public int getHeightScreen() {
+            return mHeightScreen;
+        }
 
-            // Preserver the original margins, so we can restore them after the measure step.
-            mPreservedParams.leftMargin = params.leftMargin;
-            mPreservedParams.topMargin = params.topMargin;
-            mPreservedParams.rightMargin = params.rightMargin;
-            mPreservedParams.bottomMargin = params.bottomMargin;
-            MarginLayoutParamsCompat.setMarginStart(mPreservedParams,
-                    MarginLayoutParamsCompat.getMarginStart(params));
-            MarginLayoutParamsCompat.setMarginEnd(mPreservedParams,
-                    MarginLayoutParamsCompat.getMarginEnd(params));
-
-            if (leftMarginPercent != null)
-            {
-                float base = getBaseByModeAndVal(widthHint, heightHint, this, leftMarginPercent.basemode);
-                params.leftMargin = (int) (base * leftMarginPercent.percent);
-            }
-            if (topMarginPercent != null)
-            {
-                float base = getBaseByModeAndVal(widthHint, heightHint, this, topMarginPercent.basemode);
-                params.topMargin = (int) (base * topMarginPercent.percent);
-            }
-            if (rightMarginPercent != null)
-            {
-                float base = getBaseByModeAndVal(widthHint, heightHint, this, rightMarginPercent.basemode);
-                params.rightMargin = (int) (base * rightMarginPercent.percent);
-            }
-            if (bottomMarginPercent != null)
-            {
-                float base = getBaseByModeAndVal(widthHint, heightHint, this, bottomMarginPercent.basemode);
-                params.bottomMargin = (int) (base * bottomMarginPercent.percent);
-            }
-            if (startMarginPercent != null)
-            {
-                float base = getBaseByModeAndVal(widthHint, heightHint, this, startMarginPercent.basemode);
-                MarginLayoutParamsCompat.setMarginStart(params,
-                        (int) (base * startMarginPercent.percent));
-            }
-            if (endMarginPercent != null)
-            {
-                float base = getBaseByModeAndVal(widthHint, heightHint, this, endMarginPercent.basemode);
-                MarginLayoutParamsCompat.setMarginEnd(params,
-                        (int) (base * endMarginPercent.percent));
-            }
-            if (Log.isLoggable(TAG, Log.DEBUG))
-            {
-                Log.d(TAG, "after fillMarginLayoutParams: (" + params.width + ", " + params.height
-                        + ")");
-            }
+        public int getPercentSize(int parentWidth, int parentHeight, PercentLayoutInfo info, PercentVal val){
+            float base = getBaseByModeAndVal(parentWidth, parentHeight, info, val.basemode);
+            return (int) (base * val.percent);
         }
 
         @Override
@@ -992,35 +1050,6 @@ public class PercentLayoutHelper
                     ", paddingBottomPercent=" + paddingBottomPercent +
                     ", mPreservedParams=" + mPreservedParams +
                     '}';
-        }
-
-        /**
-         * Restores original dimensions and margins after they were changed for percentage based
-         * values. Calling this method only makes sense if you previously called
-         * {@link PercentLayoutHelper.PercentLayoutInfo#fillMarginLayoutParams}.
-         */
-        public void restoreMarginLayoutParams(ViewGroup.MarginLayoutParams params)
-        {
-            restoreLayoutParams(params);
-            params.leftMargin = mPreservedParams.leftMargin;
-            params.topMargin = mPreservedParams.topMargin;
-            params.rightMargin = mPreservedParams.rightMargin;
-            params.bottomMargin = mPreservedParams.bottomMargin;
-            MarginLayoutParamsCompat.setMarginStart(params,
-                    MarginLayoutParamsCompat.getMarginStart(mPreservedParams));
-            MarginLayoutParamsCompat.setMarginEnd(params,
-                    MarginLayoutParamsCompat.getMarginEnd(mPreservedParams));
-        }
-
-        /**
-         * Restores original dimensions after they were changed for percentage based values. Calling
-         * this method only makes sense if you previously called
-         * {@link PercentLayoutHelper.PercentLayoutInfo#fillLayoutParams}.
-         */
-        public void restoreLayoutParams(ViewGroup.LayoutParams params)
-        {
-            params.width = mPreservedParams.width;
-            params.height = mPreservedParams.height;
         }
     }
 
