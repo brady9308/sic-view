@@ -10,6 +10,9 @@
         <attr name="layout_widthPercent" format="string"/>
         <attr name="layout_heightPercent" format="string"/>
 
+        <attr name="layout_widthDesign" format="dimension"/>
+        <attr name="layout_heightDesign" format="dimension"/>
+
         <attr name="layout_marginPercent" format="string"/>
         <attr name="layout_marginLeftPercent" format="string"/>
         <attr name="layout_marginTopPercent" format="string"/>
