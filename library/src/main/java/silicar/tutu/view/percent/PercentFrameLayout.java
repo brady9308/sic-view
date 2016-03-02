@@ -22,6 +22,8 @@ import android.util.AttributeSet;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
+import silicar.tutu.view.R;
+
 
 /**
  * Subclass of {@link FrameLayout} that supports percentage based dimensions and
@@ -77,6 +79,7 @@ import android.widget.FrameLayout;
  */
 public class PercentFrameLayout extends FrameLayout {
     private final PercentLayoutHelper mHelper = new PercentLayoutHelper(this);
+    private int mStyle;
 
     public PercentFrameLayout(Context context) {
         super(context);
@@ -84,10 +87,18 @@ public class PercentFrameLayout extends FrameLayout {
 
     public PercentFrameLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
+        init(context, attrs, 0, 0);
     }
 
     public PercentFrameLayout(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        init(context, attrs, 0, 0);
+    }
+
+    private void init(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes){
+        TypedArray array = context.obtainStyledAttributes(attrs, R.styleable.PercentLayout, defStyleAttr, defStyleRes);
+        mStyle = array.getResourceId(R.styleable.PercentLayout_childStyle, 0);
+        array.recycle();
     }
 
     @Override
@@ -97,7 +108,15 @@ public class PercentFrameLayout extends FrameLayout {
 
     @Override
     public LayoutParams generateLayoutParams(AttributeSet attrs) {
-        return new LayoutParams(getContext(), attrs);
+        return new LayoutParams(getContext(), attrs, mStyle);
+    }
+
+    public int getChildStyle(){
+        return mStyle;
+    }
+
+    public void setChildStyle(int style){
+        mStyle = style;
     }
 
     @Override
@@ -120,8 +139,12 @@ public class PercentFrameLayout extends FrameLayout {
         private PercentLayoutHelper.PercentLayoutInfo mPercentLayoutInfo;
 
         public LayoutParams(Context c, AttributeSet attrs) {
+            this(c, attrs, 0);
+        }
+
+        public LayoutParams(Context c, AttributeSet attrs, int style) {
             super(c, attrs);
-            mPercentLayoutInfo = PercentLayoutHelper.getPercentLayoutInfo(c, attrs);
+            mPercentLayoutInfo = PercentLayoutHelper.getPercentLayoutInfo(c, attrs, style);
         }
 
         public LayoutParams(int width, int height) {

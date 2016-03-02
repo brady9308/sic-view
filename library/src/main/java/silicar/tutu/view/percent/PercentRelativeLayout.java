@@ -22,6 +22,8 @@ import android.util.AttributeSet;
 import android.view.ViewGroup;
 import android.widget.RelativeLayout;
 
+import silicar.tutu.view.R;
+
 /**
  * Subclass of {@link RelativeLayout} that supports percentage based dimensions and
  * margins.
@@ -76,6 +78,7 @@ import android.widget.RelativeLayout;
  */
 public class PercentRelativeLayout extends RelativeLayout {
     private final PercentLayoutHelper mHelper = new PercentLayoutHelper(this);
+    private int mStyle;
 
     public PercentRelativeLayout(Context context) {
         super(context);
@@ -83,10 +86,18 @@ public class PercentRelativeLayout extends RelativeLayout {
 
     public PercentRelativeLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
+        init(context, attrs, 0, 0);
     }
 
     public PercentRelativeLayout(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
+        init(context, attrs, defStyle, 0);
+    }
+
+    private void init(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes){
+        TypedArray array = context.obtainStyledAttributes(attrs, R.styleable.PercentLayout, defStyleAttr, defStyleRes);
+        mStyle = array.getResourceId(R.styleable.PercentLayout_childStyle, 0);
+        array.recycle();
     }
 
     @Override
@@ -96,7 +107,15 @@ public class PercentRelativeLayout extends RelativeLayout {
 
     @Override
     public LayoutParams generateLayoutParams(AttributeSet attrs) {
-        return new LayoutParams(getContext(), attrs);
+        return new LayoutParams(getContext(), attrs, mStyle);
+    }
+
+    public int getChildStyle(){
+        return mStyle;
+    }
+
+    public void setChildStyle(int style){
+        mStyle = style;
     }
 
     @Override
@@ -119,8 +138,12 @@ public class PercentRelativeLayout extends RelativeLayout {
         private PercentLayoutHelper.PercentLayoutInfo mPercentLayoutInfo;
 
         public LayoutParams(Context c, AttributeSet attrs) {
+            this(c, attrs, 0);
+        }
+
+        public LayoutParams(Context c, AttributeSet attrs, int style) {
             super(c, attrs);
-            mPercentLayoutInfo = PercentLayoutHelper.getPercentLayoutInfo(c, attrs);
+            mPercentLayoutInfo = PercentLayoutHelper.getPercentLayoutInfo(c, attrs, style);
         }
 
         public LayoutParams(int width, int height) {

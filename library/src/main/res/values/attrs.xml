@@ -7,6 +7,11 @@
     </declare-styleable>
 
     <declare-styleable name="PercentLayout">
+        <attr name="childStyle" format="reference"/>
+    </declare-styleable>
+
+    <declare-styleable name="PercentLayoutInfo">
+
         <attr name="layout_widthPercent" format="string"/>
         <attr name="layout_heightPercent" format="string"/>
 

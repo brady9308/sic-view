@@ -10,12 +10,15 @@ import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 
+import silicar.tutu.view.R;
+
 /**
  * Created by tutu on 2016/2/24.
  */
 public class PercentLinearLayout extends LinearLayout {
 
-    private final PercentLayoutHelper mPercentLayoutHelper = new PercentLayoutHelper(this);
+    private final PercentLayoutHelper mHelper = new PercentLayoutHelper(this);
+    private int mStyle;
 
     public PercentLinearLayout(Context context) {
         super(context);
@@ -23,16 +26,49 @@ public class PercentLinearLayout extends LinearLayout {
 
     public PercentLinearLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
+        init(context, attrs, 0, 0);
     }
 
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     public PercentLinearLayout(Context context, AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
+        this(context, attrs, defStyleAttr, 0);
+        init(context, attrs, defStyleAttr, 0);
     }
 
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     public PercentLinearLayout(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
+        init(context, attrs, defStyleAttr, defStyleRes);
+    }
+
+    private void init(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes){
+        TypedArray array = context.obtainStyledAttributes(attrs, R.styleable.PercentLayout, defStyleAttr, defStyleRes);
+        mStyle = array.getResourceId(R.styleable.PercentLayout_childStyle, 0);
+        array.recycle();
+    }
+
+    @Override
+    protected LinearLayout.LayoutParams generateDefaultLayoutParams() {
+        if (getOrientation() == HORIZONTAL) {
+            return new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        } else if (getOrientation() == VERTICAL) {
+            return new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        }
+        return null;
+    }
+
+    @Override
+    public LayoutParams generateLayoutParams(AttributeSet attrs)
+    {
+        return new LayoutParams(getContext(), attrs, mStyle);
+    }
+
+    public int getChildStyle(){
+        return mStyle;
+    }
+
+    public void setChildStyle(int style){
+        mStyle = style;
     }
 
     @Override
@@ -49,18 +85,18 @@ public class PercentLinearLayout extends LinearLayout {
         //fixed scrollview height problems
         if (heightMode == MeasureSpec.UNSPECIFIED && getParent() != null && (getParent() instanceof ScrollView))
         {
-            int baseHeight = mPercentLayoutHelper.getHeightScreen();
+            int baseHeight = mHelper.getHeightScreen();
             tmpHeightMeasureSpec = MeasureSpec.makeMeasureSpec(baseHeight, heightMode);
         }
         if (heightMode == MeasureSpec.UNSPECIFIED && getParent() != null && (getParent() instanceof HorizontalScrollView))
         {
-            int baseWidth = mPercentLayoutHelper.getWidthScreen();
+            int baseWidth = mHelper.getWidthScreen();
             tmpWidthMeasureSpec = MeasureSpec.makeMeasureSpec(baseWidth, widthMode);
         }
 
-        mPercentLayoutHelper.adjustChildren(tmpWidthMeasureSpec, tmpHeightMeasureSpec);
+        mHelper.adjustChildren(tmpWidthMeasureSpec, tmpHeightMeasureSpec);
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        if (mPercentLayoutHelper.handleMeasuredStateTooSmall())
+        if (mHelper.handleMeasuredStateTooSmall())
         {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         }
@@ -70,23 +106,7 @@ public class PercentLinearLayout extends LinearLayout {
     protected void onLayout(boolean changed, int l, int t, int r, int b)
     {
         super.onLayout(changed, l, t, r, b);
-        mPercentLayoutHelper.restoreOriginalParams();
-    }
-
-    @Override
-    protected LinearLayout.LayoutParams generateDefaultLayoutParams() {
-        if (getOrientation() == HORIZONTAL) {
-            return new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-        } else if (getOrientation() == VERTICAL) {
-            return new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        }
-        return null;
-    }
-
-    @Override
-    public LayoutParams generateLayoutParams(AttributeSet attrs)
-    {
-        return new LayoutParams(getContext(), attrs);
+        mHelper.restoreOriginalParams();
     }
 
 
@@ -96,8 +116,12 @@ public class PercentLinearLayout extends LinearLayout {
         private PercentLayoutHelper.PercentLayoutInfo mPercentLayoutInfo;
 
         public LayoutParams(Context c, AttributeSet attrs) {
+            this(c, attrs, 0);
+        }
+
+        public LayoutParams(Context c, AttributeSet attrs, int style) {
             super(c, attrs);
-            mPercentLayoutInfo = PercentLayoutHelper.getPercentLayoutInfo(c, attrs);
+            mPercentLayoutInfo = PercentLayoutHelper.getPercentLayoutInfo(c, attrs, style);
         }
 
         public LayoutParams(int width, int height) {
@@ -128,7 +152,6 @@ public class PercentLinearLayout extends LinearLayout {
             this.gravity = source.gravity;
             this.mPercentLayoutInfo = source.mPercentLayoutInfo;
        }
-
 
         @Override
         public PercentLayoutHelper.PercentLayoutInfo getPercentLayoutInfo()
